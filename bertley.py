@@ -1,5 +1,4 @@
 import argparse
-from datasets import Dataset
 import json
 from transformers import (
     AutoTokenizer,
@@ -31,10 +30,10 @@ def chunk_and_classify(text, classifier, tokenizer, max_len=512, stride=50):
     # tokenize entire doc once
     tokens = tokenizer(text, return_tensors="pt")["input_ids"][0]
     chunks = []
-    for start in range(0, tokens.size(0), max_len - stride):
-        chunk_ids = tokens[start : start + max_len]
+    for i in range(0, tokens.size(0), max_len - stride):
+        chunk_ids = tokens[i : i + max_len]
         chunks.append(tokenizer.decode(chunk_ids, skip_special_tokens=True))
-        if start + max_len >= tokens.size(0):
+        if i + max_len >= tokens.size(0):
             break
 
     # classify each chunk
@@ -52,13 +51,18 @@ def chunk_and_classify(text, classifier, tokenizer, max_len=512, stride=50):
 
 
 def main():
+
+    # This initial set of lines defines the command line arguments this
+    # program uses
+
+    default_dir = "./BERTley/checkpoint-3486"
     parser = argparse.ArgumentParser(
         description="Run inference on a trained BERT metadata classifier"
     )
     parser.add_argument(
         "--model_dir",
         type=str,
-        default="./BERTley",
+        default=default_dir,
         help="Directory where your trained model and config live",
     )
     group = parser.add_mutually_exclusive_group(required=True)
@@ -70,11 +74,12 @@ def main():
     )
     args = parser.parse_args()
 
-    # 1) Load tokenizer + model (config.json has the id2label/label2id baked in)
+    # 1) Load tokenizer + model (config.json should have the id2label/label2id baked in
+    # thru training script)
     tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
     model = AutoModelForSequenceClassification.from_pretrained(args.model_dir)
 
-    # 2) Build the pipeline
+    # 2) Build the pipeline...
     classifier = pipeline(
         "text-classification",
         model=model,
@@ -88,7 +93,7 @@ def main():
     else:
         text = args.text
 
-    # if it’s longer than 512 tokens, needs to be chunk + classified
+    # If it’s longer than 512 tokens, needs to be chunked + classified
     # otherwise single call
     tokens = tokenizer(text, return_tensors="pt")["input_ids"]
     if tokens.size(1) <= 512:
